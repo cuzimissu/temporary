@@ -1,38 +1,322 @@
-<!-- 단순 계산기: 두 숫자 더하기 + 평균 예제 -->
-<div id="calc-box" style="max-width:600px;border:1px solid #ddd;padding:12px;border-radius:8px;">
-  <h3 style="margin:0 0 8px 0;">간단 계산기</h3>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>고급 아이템 비용 계산기 (파생합계 반영)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, "Noto Sans KR", sans-serif; padding: 18px; }
+    h2 { margin-top: 0; }
+    table { border-collapse: collapse; width: 100%; max-width: 1200px; font-size: 14px; }
+    th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: center; vertical-align: middle; }
+    th { background: #f6f6f6; }
+    input[type=number] { width: 120px; text-align: right; padding:4px; }
+    .readonly { background:#fafafa; color:#333; }
+    tfoot td { font-weight: 700; background:#fafafa; }
+    .note { font-size:13px; color:#666; margin-top:8px; }
+    .right { text-align:right; }
+  </style>
+</head>
+<body>
+  <h2>고급 아이템 비용 계산기 (파생합계 반영)</h2>
+  <p class="note">단가(C) 또는 총액(E)가 다른 행들의 합계를 참조하는 경우 자동으로 반영됩니다. 보유수량(D)을 입력하면 각 행의 총액과 전체 합계가 자동 갱신됩니다.</p>
 
-  <label>값 A: <input id="a" type="number" step="any" style="width:140px"></label>
-  <label style="margin-left:12px;">값 B: <input id="b" type="number" step="any" style="width:140px"></label>
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>아이템명</th>
+        <th>수량 (B)</th>
+        <th>단가 (C) — 입력/자동</th>
+        <th>보유수량 (D) — 입력</th>
+        <th>총액 (E)</th>
+      </tr>
+    </thead>
+    <tbody id="bodyRows">
+      <!-- rows will be injected by JS -->
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" class="right">최종 합계</td>
+        <td id="grandTotal">0</td>
+      </tr>
+    </tfoot>
+  </table>
 
-  <div style="margin-top:10px;">
-    <button id="btn-calc" type="button">계산</button>
-    <button id="btn-reset" type="button" style="margin-left:6px;">초기화</button>
-  </div>
+  <script>
+  // 데이터 정의 (배열 인덱스는 1부터 시작해서 이해가 더 쉽도록 첫 요소는 null)
+  // 각 항목: {name, qty, unitType, unitValue, unitRefs, own (initial 0), totalType, totalRefs}
+  // unitType: 'input' or 'sumRef' (sumRef means C = SUM(E[a..b] or E[list])
+  // totalType: 'calc' (MAX(B-D,0)*C) or 'sumRef' (E = SUM(E[...]))
+  // unitRefs/totalRefs: arrays of indices to sum
+  const items = [
+    null,
+    {name:"신수의근원(백호)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null},
+    {name:"신수의근원(청룡)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:5, totalType:'calc', totalRefs:null},
+    {name:"신수의근원(현무)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null},
+    {name:"신수의근원(기린)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:5, totalType:'calc', totalRefs:null},
+    {name:"신수의근원(주작)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:5, totalType:'calc', totalRefs:null},
+    {name:"심연의정수", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:1, totalType:'calc', totalRefs:null},
+    // 7 힘의근원: total = sum(E1:E6) (unit not used; but earlier qty maybe 5 -> we'll keep qty 5 and set unit = sum(E1..E6) so total = MAX(5-own,0)*unit)
+    {name:"힘의근원 (요약/참조)", qty:5, unitType:'sumRef', unitValue:0, unitRefs:[1,2,3,4,5,6], own:0, totalType:'calc', totalRefs:null},
 
-  <div id="results" style="margin-top:12px;background:#fafafa;padding:10px;border-radius:6px;border:1px solid #eee;">
-    <div>합계: <span id="sum">-</span></div>
-    <div>평균: <span id="avg">-</span></div>
-  </div>
-</div>
+    // skip two blank rows in original sheet mapping; we keep indices aligned to user's formula numbering
+    null, // index 8 placeholder
+    null, // index 9 placeholder
 
-<script>
-(function(){
-  const el = (id)=>document.getElementById(id);
-  function calc(){
-    const a = parseFloat(el('a').value) || 0;
-    const b = parseFloat(el('b').value) || 0;
-    el('sum').textContent = (a + b).toLocaleString();
-    el('avg').textContent = ((a + b) / 2).toLocaleString();
+    {name:"수수료", qty:1, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, // index 10
+    {name:"1억 지전 (개별)", qty:1, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, // index 11
+    // The original had =sum(E10) for something — later used as sum(E10) for C43; we'll reference E10 as needed.
+
+    null, null, // 12,13 placeholders
+
+    {name:"오색가루", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, // 14
+    {name:"사신의 정기(雷)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:5, totalType:'calc', totalRefs:null}, // 15
+    {name:"작은뇌전의속성석", qty:20, unitType:'input', unitValue:0, unitRefs:null, own:200, totalType:'calc', totalRefs:null}, //16
+    {name:"고대 뇌의 인장(雷)", qty:20, unitType:'input', unitValue:0, unitRefs:null, own:200, totalType:'calc', totalRefs:null}, //17
+    {name:"뇌정석", qty:30, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, //18
+    // 19 번개치는 사신의 인장(雷): total = sum(E14:E18)
+    {name:"번개치는 사신의 인장(雷) (집계)", qty:0, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'sumRef', totalRefs:[14,15,16,17,18]}, //19
+
+    null, null, // 20,21
+
+    {name:"시간의가루 (그룹A)", qty:5, unitType:'input', unitValue:0, unitRefs:null, own:5, totalType:'calc', totalRefs:null}, //22
+    {name:"사신의 정기(雷) (대량)", qty:20, unitType:'input', unitValue:0, unitRefs:null, own:200, totalType:'calc', totalRefs:null}, //23
+    {name:"조각난 청룡의 석판", qty:50, unitType:'input', unitValue:0, unitRefs:null, own:50, totalType:'calc', totalRefs:null}, //24
+    // 25 고대 청룡의 석판(雷) : total = sum(E22:E24)
+    {name:"고대 청룡의 석판(雷) (집계)", qty:0, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'sumRef', totalRefs:[22,23,24]}, //25
+
+    null, null, //26,27
+
+    {name:"고대 청룡의 석판(雷) (개별)", qty:1, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, //28
+    {name:"시간의가루 (그룹B)", qty:10, unitType:'input', unitValue:0, unitRefs:null, own:10, totalType:'calc', totalRefs:null}, //29
+    // 30 번개치는 사신의 인장(雷) : unit C30 = sum(E14:E18) ; qty 10
+    {name:"번개치는 사신의 인장(雷) (단가=sum E14:E18)", qty:10, unitType:'sumRef', unitValue:0, unitRefs:[14,15,16,17,18], own:0, totalType:'calc', totalRefs:null}, //30
+    // 31 번개치는 청룡의 석판(雷) : total = sum(E28:E30)
+    {name:"번개치는 청룡의 석판(雷) (집계)", qty:0, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'sumRef', totalRefs:[28,29,30]}, //31
+
+    null, null, //32,33
+
+    {name:"시간의가루 (그룹C)", qty:10, unitType:'input', unitValue:0, unitRefs:null, own:10, totalType:'calc', totalRefs:null}, //34
+    {name:"별의파편(雷)", qty:20, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, //35
+    {name:"황옥 조각", qty:30, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'calc', totalRefs:null}, //36
+    // 37 빛나는 황옥 = sum(E34:E36)
+    {name:"빛나는 황옥 (집계)", qty:0, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'sumRef', totalRefs:[34,35,36]}, //37
+
+    null, null, null, //38,39,40 placeholders (40 will be defined next to match numbering)
+    // 40 삼인검
+    {name:"삼인검", qty:1, unitType:'input', unitValue:0, unitRefs:null, own:1, totalType:'calc', totalRefs:null}, //40 (position matching)
+    // 41 번개치는 청룡의 석판(雷) : unit = sum(E28:E30) ; qty 1
+    {name:"번개치는 청룡의 석판(雷) (단가=sum E28:E30)", qty:1, unitType:'sumRef', unitValue:0, unitRefs:[28,29,30], own:0, totalType:'calc', totalRefs:null}, //41
+    // 42 힘의근원 (최종) : C42 = sum(E1:E6), qty 5 -> total = MAX(5-own,0)*C42
+    {name:"힘의근원 (최종 제조용)", qty:5, unitType:'sumRef', unitValue:0, unitRefs:[1,2,3,4,5,6], own:0, totalType:'calc', totalRefs:null}, //42
+    // 43 1억 지전(집계) : C43 = sum(E10) ; qty 5
+    {name:"1억 지전 (집계)", qty:5, unitType:'sumRef', unitValue:0, unitRefs:[10], own:0, totalType:'calc', totalRefs:null}, //43
+    // 44 빛나는 황옥 (최종) : C44 = sum(E34:E36) ; qty 10
+    {name:"빛나는 황옥 (최종 제조용)", qty:10, unitType:'sumRef', unitValue:0, unitRefs:[34,35,36], own:0, totalType:'calc', totalRefs:null}, //44
+    // 45 사인검 : total = sum(E41:E44)
+    {name:"사인검 (최종)", qty:0, unitType:'input', unitValue:0, unitRefs:null, own:0, totalType:'sumRef', totalRefs:[41,42,43,44]} //45
+  ];
+
+  // We'll keep runtime arrays for current computed totals and units
+  const N = items.length - 1;
+  const computedUnit = Array(items.length).fill(0); // C values after resolving sumRefs
+  const computedTotal = Array(items.length).fill(0); // E values
+
+  // Helper: sum of E over a list of indices
+  function sumE(indices) {
+    let s = 0;
+    for (const idx of indices) {
+      if (!idx || !items[idx]) continue;
+      s += computedTotal[idx] || 0;
+    }
+    return s;
   }
-  el('btn-calc').addEventListener('click', calc);
-  el('btn-reset').addEventListener('click', ()=>{
-    el('a').value=''; el('b').value=''; el('sum').textContent='-'; el('avg').textContent='-';
-  });
 
-  // Enter 눌러도 계산되게 (선택)
-  document.querySelectorAll('#a,#b').forEach(i=>{
-    i.addEventListener('keydown', function(e){ if(e.key === 'Enter') calc(); });
-  });
-})();
-</script>
+  // Initialize DOM rows
+  const tbody = document.getElementById('bodyRows');
+
+  function createRow(i, item) {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = i;
+
+    const tdIndex = document.createElement('td');
+    tdIndex.textContent = i;
+    tr.appendChild(tdIndex);
+
+    const tdName = document.createElement('td');
+    tdName.textContent = item.name;
+    tr.appendChild(tdName);
+
+    const tdQty = document.createElement('td');
+    tdQty.textContent = item.qty;
+    tdQty.className = 'right';
+    tr.appendChild(tdQty);
+
+    const tdUnit = document.createElement('td');
+    if (item.unitType === 'input') {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.min = 0;
+      inp.value = item.unitValue || '';
+      inp.className = 'unitInput';
+      inp.addEventListener('input', onInputChange);
+      tdUnit.appendChild(inp);
+    } else {
+      // sumRef: show as readonly, computed
+      const span = document.createElement('span');
+      span.className = 'readonly unitComputed';
+      span.textContent = '0';
+      tdUnit.appendChild(span);
+    }
+    tr.appendChild(tdUnit);
+
+    const tdOwn = document.createElement('td');
+    const inpOwn = document.createElement('input');
+    inpOwn.type = 'number';
+    inpOwn.min = 0;
+    inpOwn.value = item.own || 0;
+    inpOwn.className = 'ownInput';
+    inpOwn.addEventListener('input', onInputChange);
+    tdOwn.appendChild(inpOwn);
+    tr.appendChild(tdOwn);
+
+    const tdTotal = document.createElement('td');
+    tdTotal.className = 'totalCell';
+    tdTotal.textContent = '0';
+    tr.appendChild(tdTotal);
+
+    return tr;
+  }
+
+  // Build table
+  for (let i=1;i<items.length;i++){
+    const it = items[i];
+    if (!it) {
+      // placeholder row (to keep numbering familiar) - show empty row
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i}</td><td colspan="5" style="background:#fff;"></td>`;
+      tbody.appendChild(tr);
+      continue;
+    }
+    tbody.appendChild(createRow(i, it));
+  }
+
+  // Read inputs from DOM helpers
+  function readInputs() {
+    // read unit inputs and own inputs to items
+    document.querySelectorAll('#bodyRows tr').forEach(tr=>{
+      const idx = parseInt(tr.dataset.idx);
+      if (!idx || !items[idx]) return;
+      const item = items[idx];
+      const unitInp = tr.querySelector('.unitInput');
+      if (unitInp) {
+        // user-provided unit
+        const v = parseFloat(unitInp.value);
+        item.unitValue = isNaN(v) ? 0 : v;
+      }
+      const ownInp = tr.querySelector('.ownInput');
+      if (ownInp) {
+        const v = parseInt(ownInp.value);
+        item.own = isNaN(v) ? 0 : v;
+      }
+    });
+  }
+
+  // Core evaluation: iteratively resolve dependent sums until stable (simple fixed-point loop)
+  function evaluateAll() {
+    // initialize computed arrays
+    for (let i=1;i<items.length;i++){
+      computedUnit[i] = 0;
+      computedTotal[i] = 0;
+    }
+
+    // first, set computedUnit for input types from item.unitValue
+    for (let i=1;i<items.length;i++){
+      const it = items[i];
+      if (!it) continue;
+      if (it.unitType === 'input') {
+        computedUnit[i] = Number(it.unitValue) || 0;
+      }
+    }
+
+    // We'll iterate multiple times to propagate sums; limit iterations to avoid infinite loops
+    for (let iter=0; iter<20; iter++){
+      // compute totals for items whose totalType is 'calc' (use current computedUnit)
+      for (let i=1;i<items.length;i++){
+        const it = items[i];
+        if (!it) continue;
+        if (it.totalType === 'calc') {
+          const qty = Number(it.qty) || 0;
+          const own = Number(it.own) || 0;
+          const unit = Number(computedUnit[i]) || 0;
+          const need = Math.max(qty - own, 0);
+          computedTotal[i] = need * unit;
+        } else if (it.totalType === 'sumRef' && Array.isArray(it.totalRefs)) {
+          // sum referenced E's
+          computedTotal[i] = sumE(it.totalRefs);
+        } else {
+          computedTotal[i] = 0;
+        }
+      }
+
+      // update computedUnit for items with unitType sumRef
+      for (let i=1;i<items.length;i++){
+        const it = items[i];
+        if (!it) continue;
+        if (it.unitType === 'sumRef' && Array.isArray(it.unitRefs)) {
+          computedUnit[i] = sumE(it.unitRefs);
+        }
+      }
+    }
+  }
+
+  // Update DOM from computed arrays
+  function updateDOM() {
+    document.querySelectorAll('#bodyRows tr').forEach(tr=>{
+      const idx = parseInt(tr.dataset.idx);
+      if (!idx || !items[idx]) return;
+      // unit cell
+      const it = items[idx];
+      const unitSpan = tr.querySelector('.unitComputed');
+      if (unitSpan) {
+        unitSpan.textContent = (computedUnit[idx] || 0).toLocaleString();
+      } else {
+        // if user input unit exists, ensure formatted display not necessary
+      }
+      // total cell
+      const tdTotal = tr.querySelector('.totalCell');
+      tdTotal.textContent = (computedTotal[idx] || 0).toLocaleString();
+    });
+
+    // grand total = sum of all computedTotal (but usually only final relevant rows contribute; we'll sum all)
+    let grand = 0;
+    for (let i=1;i<computedTotal.length;i++){
+      grand += Number(computedTotal[i] || 0);
+    }
+    document.getElementById('grandTotal').textContent = grand.toLocaleString();
+  }
+
+  // on input change
+  function onInputChange() {
+    readInputs();
+    evaluateAll();
+    updateDOM();
+  }
+
+  // initial read and evaluate
+  readInputs();
+  evaluateAll();
+  updateDOM();
+
+  // expose a convenient function to reset all inputs
+  window.resetAll = function() {
+    document.querySelectorAll('.unitInput, .ownInput').forEach(inp => { inp.value = ''; });
+    readInputs();
+    evaluateAll();
+    updateDOM();
+  };
+
+  </script>
+</body>
+</html>
