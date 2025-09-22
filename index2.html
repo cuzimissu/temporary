@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>아이템 비용 계산기</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { border-collapse: collapse; width: 100%; max-width: 1100px; font-size: 14px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: center; }
+    th { background: #f4f4f4; }
+    input { width: 120px; text-align: right; }
+    tfoot td { font-weight: bold; background: #fafafa; }
+  </style>
+</head>
+<body>
+  <h2>아이템 비용 계산기</h2>
+  <table id="calcTable">
+    <thead>
+      <tr>
+        <th>아이템명</th>
+        <th>수량</th>
+        <th>단가 (입력)</th>
+        <th>보유수량 (입력)</th>
+        <th>총액</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>신수의근원(백호)</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>신수의근원(청룡)</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>신수의근원(현무)</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>신수의근원(기린)</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>신수의근원(주작)</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>심연의정수</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>힘의근원</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>수수료</td><td data-qty="1">1</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>1억 지전</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>오색가루</td><td data-qty="5">5</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>사신의 정기(雷)</td><td data-qty="20">20</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>작은뇌전의속성석</td><td data-qty="20">20</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>고대 뇌의 인장(雷)</td><td data-qty="20">20</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>뇌정석</td><td data-qty="30">30</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>번개치는 사신의 인장(雷)</td><td data-qty="10">10</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>시간의가루</td><td data-qty="10">10</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>조각난 청룡의 석판</td><td data-qty="50">50</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>고대 청룡의 석판(雷)</td><td data-qty="1">1</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>번개치는 청룡의 석판(雷)</td><td data-qty="1">1</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>별의파편(雷)</td><td data-qty="20">20</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>황옥 조각</td><td data-qty="30">30</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>빛나는 황옥</td><td data-qty="10">10</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>삼인검</td><td data-qty="1">1</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+      <tr><td>사인검</td><td data-qty="1">1</td><td><input type="number" class="unit"></td><td><input type="number" class="own"></td><td class="total">0</td></tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4">총합</td>
+        <td id="grandTotal">0</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    const table = document.getElementById("calcTable");
+
+    function updateCalc() {
+      let grand = 0;
+      table.querySelectorAll("tbody tr").forEach(row => {
+        const qty = parseInt(row.querySelector("td[data-qty]").dataset.qty) || 0;
+        const unit = parseFloat(row.querySelector(".unit").value) || 0;
+        const own = parseInt(row.querySelector(".own").value) || 0;
+        const need = Math.max(qty - own, 0);
+        const total = need * unit;
+        row.querySelector(".total").textContent = total.toLocaleString();
+        grand += total;
+      });
+      document.getElementById("grandTotal").textContent = grand.toLocaleString();
+    }
+
+    // input 변경 시 자동 계산
+    table.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", updateCalc);
+    });
+  </script>
+</body>
+</html>
