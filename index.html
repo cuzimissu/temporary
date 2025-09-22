@@ -1,0 +1,38 @@
+<!-- 단순 계산기: 두 숫자 더하기 + 평균 예제 -->
+<div id="calc-box" style="max-width:600px;border:1px solid #ddd;padding:12px;border-radius:8px;">
+  <h3 style="margin:0 0 8px 0;">간단 계산기</h3>
+
+  <label>값 A: <input id="a" type="number" step="any" style="width:140px"></label>
+  <label style="margin-left:12px;">값 B: <input id="b" type="number" step="any" style="width:140px"></label>
+
+  <div style="margin-top:10px;">
+    <button id="btn-calc" type="button">계산</button>
+    <button id="btn-reset" type="button" style="margin-left:6px;">초기화</button>
+  </div>
+
+  <div id="results" style="margin-top:12px;background:#fafafa;padding:10px;border-radius:6px;border:1px solid #eee;">
+    <div>합계: <span id="sum">-</span></div>
+    <div>평균: <span id="avg">-</span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const el = (id)=>document.getElementById(id);
+  function calc(){
+    const a = parseFloat(el('a').value) || 0;
+    const b = parseFloat(el('b').value) || 0;
+    el('sum').textContent = (a + b).toLocaleString();
+    el('avg').textContent = ((a + b) / 2).toLocaleString();
+  }
+  el('btn-calc').addEventListener('click', calc);
+  el('btn-reset').addEventListener('click', ()=>{
+    el('a').value=''; el('b').value=''; el('sum').textContent='-'; el('avg').textContent='-';
+  });
+
+  // Enter 눌러도 계산되게 (선택)
+  document.querySelectorAll('#a,#b').forEach(i=>{
+    i.addEventListener('keydown', function(e){ if(e.key === 'Enter') calc(); });
+  });
+})();
+</script>
